@@ -364,7 +364,7 @@ process.patOut.outputCommands = ['drop *']
 process.patOut.outputCommands.append('keep *_patMETs*_*_*')
 process.patOut.outputCommands.append('keep *_hltOnlineBeamSpot_*_*')
 process.patOut.outputCommands.append('keep *_hltIsoMuonVertex_*_*')
-process.patOut.outputCommands.append('keep *_hltPixelVertices_*_*')
+process.patOut.outputCommands.append('keep *_hltPixelVertices*_*_*')
 process.patOut.outputCommands.append('keep *_hltOnlinePrimaryVertices_*_*')
 process.patOut.outputCommands.append('keep *_offlinePrimaryVertices_*_*')
 process.patOut.outputCommands.append('keep *_selectedPrimaryVertices_*_*')
