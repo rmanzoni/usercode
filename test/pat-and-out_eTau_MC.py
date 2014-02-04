@@ -1,4 +1,4 @@
-isMC = False
+isMC = True
 #Output module
 from PhysicsTools.PatAlgos.patEventContent_cff import patEventContentNoCleaning
 process.patOut = cms.OutputModule(
@@ -209,7 +209,7 @@ process.patElectrons.isolationValuesNoPFId = cms.PSet(
 process.hltPatTaus = cms.EDProducer(
     "PATTauProducer",
     # input
-    tauSource = cms.InputTag("hltIsoMuPFTaus"),
+    tauSource = cms.InputTag("hltIsoElePFTaus"),
     # add user data
     userData = cms.PSet(
       # add custom classes here
@@ -268,10 +268,10 @@ process.hltPatTaus = cms.EDProducer(
         # configure many IDs as InputTag <someName> = <someTag>
         # you can comment out those you don't want to save some
         # disk space
-        decayModeFinding = cms.InputTag("hltIsoMuPFTauTrackFindingDiscriminator"),
-        byIsolation = cms.InputTag("hltIsoMuPFTauLooseIsolationDiscriminatorNoFilters"),
-        byECalIsolation = cms.InputTag("hltIsoMuPFTauECalIsolationDiscriminatorNoFilters"),
-        byTrkIsolation = cms.InputTag("hltIsoMuPFTauTrkIsolationDiscriminatorNoFilters"),
+        decayModeFinding = cms.InputTag("hltIsoElePFTauTrackFindingDiscriminator"),
+        byIsolation = cms.InputTag("hltIsoElePFTauLooseIsolationDiscriminatorNoFilters"),
+        byECalIsolation = cms.InputTag("hltIsoElePFTauECalIsolationDiscriminatorNoFilters"),
+        byTrkIsolation = cms.InputTag("hltIsoElePFTauTrkIsolationDiscriminatorNoFilters"),
     ),
     # mc matching configurables
     addGenMatch      = cms.bool(False),
@@ -287,12 +287,12 @@ process.hltPatTaus = cms.EDProducer(
     addResolutions  = cms.bool(False),
     resolutions     = cms.PSet()
 )
-process.hltPatTausStdVtx = process.hltPatTaus.clone(tauSource = 'hltIsoMuPFTausStdVtx')
+process.hltPatTausStdVtx = process.hltPatTaus.clone(tauSource = 'hltPFTausStdVtx')
 process.hltPatTausStdVtx.tauIDSources = cms.PSet(
-        decayModeFinding = cms.InputTag("hltIsoMuPFTauTrackFindingDiscriminatorStdVtx"),
-        byIsolation = cms.InputTag("hltIsoMuPFTauLooseIsolationDiscriminatorStdVtxNoFilters"),
-        byECalIsolation = cms.InputTag("hltIsoMuPFTauECalIsolationDiscriminatorStdVtxNoFilters"),
-        byTrkIsolation = cms.InputTag("hltIsoMuPFTauTrkIsolationDiscriminatorStdVtxNoFilters"),
+        decayModeFinding = cms.InputTag("hltPFTauTrackFindingDiscriminatorStdVtx"),
+        byIsolation = cms.InputTag("hltPFTauLooseIsolationDiscriminatorStdVtx"),
+        byECalIsolation = cms.InputTag("hltPFTauECalIsolationDiscriminatorStdVtx"),
+        byTrkIsolation = cms.InputTag("hltPFTauTrkIsolationDiscriminatorStdVtx"),
         )
 process.selectedHltPatTaus = cms.EDFilter(
     "PATTauSelector",
@@ -384,15 +384,15 @@ process.selectedTausFixedCone = process.selectedTaus.clone(
     cut = cms.string("pt>17 && abs(eta)<2.3 && tauID('byLeadingPion')>0.5")
 )
 
-process.isolatedMuons = cms.EDFilter(
-    "PATMuonSelector",
-    src = cms.InputTag("selectedPatMuonsUserEmbedded"),
-    cut = cms.string("pt>15 && abs(eta)<2.1 && isGlobalMuon && isPFMuon && isTrackerMuon && userFloat('PFRelIsoDB04v2')<0.15"),
+process.isolatedElectrons = cms.EDFilter(
+    "PATElectronSelector",
+    src = cms.InputTag("selectedPatElectronsUserIsoEmbedded"),
+    cut = cms.string("pt>15 && abs(eta)<2.1 && "+simpleCutsVeto+" && userFloat('PFRelIsoDB04v3')<0.15"),
     filter = cms.bool(False)
     )
-process.isolatedMuonsCounter = cms.EDFilter(
+process.isolatedElectronsCounter = cms.EDFilter(
     "CandViewCountFilter",
-    src = cms.InputTag("isolatedMuons"),
+    src = cms.InputTag("isolatedElectrons"),
     minNumber = cms.uint32(1)
     )
 
@@ -408,26 +408,27 @@ process.isolatedTausCounter = cms.EDFilter(
     minNumber = cms.uint32(1)
     )
 
-process.muTauPairs  = cms.EDProducer(
+process.eleTauPairs  = cms.EDProducer(
     "CandViewShallowCloneCombiner",
-    decay = cms.string("isolatedMuons isolatedTaus"),
+    decay = cms.string("isolatedElectrons isolatedTaus"),
     checkCharge = cms.bool(False),
     cut         = cms.string("sqrt((daughter(0).eta-daughter(1).eta)*(daughter(0).eta-daughter(1).eta)+  min( abs(daughter(0).phi-daughter(1).phi), 2*3.1415926 - abs(daughter(0).phi-daughter(1).phi)  ) *  min( abs(daughter(0).phi-daughter(1).phi), 2*3.1415926 - abs(daughter(0).phi-daughter(1).phi)  )  )>0.5")
                                     )
-process.muTauPairsCounter = cms.EDFilter(
+process.eleTauPairsCounter = cms.EDFilter(
     "CandViewCountFilter",
-    src = cms.InputTag("muTauPairs"),
+    src = cms.InputTag("eleTauPairs"),
     minNumber = cms.uint32(1)
     )
 
 process.offlineSelectionSequence = cms.Sequence(
     process.selectedPrimaryVertices+process.primaryVertexCounter+
     process.selectedPatElectronsUserIsoEmbedded+process.selectedElectrons+
-    process.selectedPatMuonsUserEmbedded+process.selectedMuons+process.isolatedMuons+process.isolatedMuonsCounter+
+    process.selectedPatMuonsUserEmbedded+process.selectedMuons+
+    process.isolatedElectrons+process.isolatedElectronsCounter+
     process.selectedPatTausUserEmbedded+process.selectedTaus+
     process.selectedPatTausUserEmbeddedFixedCone+process.selectedTausFixedCone+
     process.isolatedTaus+process.isolatedTausCounter
-    +process.muTauPairs+process.muTauPairsCounter)
+    +process.eleTauPairs+process.eleTauPairsCounter)
 
 process.offlineSequence += process.offlineSelectionSequence
 
@@ -436,6 +437,7 @@ process.patOut.outputCommands = ['drop *']
 process.patOut.outputCommands.append('keep *_patMETs*_*_*')
 process.patOut.outputCommands.append('keep *_hltOnlineBeamSpot_*_*')
 process.patOut.outputCommands.append('keep *_hltIsoMuonVertex_*_*')
+process.patOut.outputCommands.append('keep *_hltIsoEleVertex_*_*')
 process.patOut.outputCommands.append('keep *_hltPixelVertices_*_*')
 process.patOut.outputCommands.append('keep *_hltOnlinePrimaryVertices_*_*')
 process.patOut.outputCommands.append('keep *_offlinePrimaryVertices_*_*')
