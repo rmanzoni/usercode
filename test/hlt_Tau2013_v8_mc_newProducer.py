@@ -1,10 +1,8 @@
 # /users/mbluj/CMSSW_5_2_8/Tau2013/V8 (CMSSW_5_2_8)
 
 # User switches
-isMC = True
-#isMC = False
-isFake = False
-#isFake = True
+isMC   = True
+isFake = True
 
 import FWCore.ParameterSet.Config as cms
 
@@ -4891,19 +4889,19 @@ process.HLT_IsoMu17_eta2p1_LooseIsoPFTau20_NoFilters_v7.replace(
 )
 process.patOut.SelectEvents.SelectEvents = ["HLT_IsoMu17_eta2p1_LooseIsoPFTau20_NoFilters_v7"]
 
-process.patOut.outputCommands.append("keep *_UCT2015Producer_*_*")
-process.patOut.outputCommands.append("keep *_uct2015L1ExtraParticles_*_*")
-process.patOut.outputCommands.append("keep *_l1ExtraParticles_*_*")
-process.patOut.outputCommands.append("keep *_l1extraParticles_*_*")
-process.patOut.outputCommands.append("keep *_genParticles_*_*")
-process.patOut.outputCommands.append("keep *_hltMuons_*_*")
-process.patOut.outputCommands.append("keep *_hltL2Muons_*_*")
-process.patOut.outputCommands.append("keep *_hltL3crIsoL1sMu14erORMu16erL1f0L2f14QL3f17QL3crIsoRhoFiltered0p15_*_*")
-process.patOut.outputCommands.append("keep *_hltL3MuonCandidates_*_*")
-process.patOut.outputCommands.append("keep *_towerMaker_*_*")
-process.patOut.outputCommands.append("keep *_hltTowerMakerForPF_*_*")
-process.patOut.outputCommands.append("keep *_selectedTausFixedCone_*_*")
-process.patOut.outputCommands.append("keep *_addPileupInfo_*_*")
+# process.patOut.outputCommands.append("keep *_UCT2015Producer_*_*")
+# process.patOut.outputCommands.append("keep *_uct2015L1ExtraParticles_*_*")
+# process.patOut.outputCommands.append("keep *_l1ExtraParticles_*_*")
+# process.patOut.outputCommands.append("keep *_l1extraParticles_*_*")
+# process.patOut.outputCommands.append("keep *_genParticles_*_*")
+# process.patOut.outputCommands.append("keep *_hltMuons_*_*")
+# process.patOut.outputCommands.append("keep *_hltL2Muons_*_*")
+# process.patOut.outputCommands.append("keep *_hltL3crIsoL1sMu14erORMu16erL1f0L2f14QL3f17QL3crIsoRhoFiltered0p15_*_*")
+# process.patOut.outputCommands.append("keep *_hltL3MuonCandidates_*_*")
+# process.patOut.outputCommands.append("keep *_towerMaker_*_*")
+# process.patOut.outputCommands.append("keep *_hltTowerMakerForPF_*_*")
+# process.patOut.outputCommands.append("keep *_selectedTausFixedCone_*_*")
+# process.patOut.outputCommands.append("keep *_addPileupInfo_*_*")
 
 # Customise source (for tests)
 if not isMC:
