@@ -71,13 +71,11 @@ def plot( basehisto, basehistolegend, name, xaxis, yaxis, title='', morehistos =
   
   c1.SaveAs(name+'.pdf')
 
-
-
 file = ROOT.TFile.Open('out2.root','read')
 
 file.cd()
 
-variable = '_pt'
+variable = '_gen_pt'
 
 
 offTaus             = ROOT.gDirectory.FindObjectAny('offTaus'             + variable)
@@ -88,6 +86,8 @@ onlTauPixPassingDM  = ROOT.gDirectory.FindObjectAny('onlTauPixPassingDM'  + vari
 onlTauMuPassingIso  = ROOT.gDirectory.FindObjectAny('onlTauMuPassingIso'  + variable)
 onlTauPixPassingIso = ROOT.gDirectory.FindObjectAny('onlTauPixPassingIso' + variable)
 
+vert = ROOT.gDirectory.FindObjectAny('pixVtx_failDMonl_noOnlTrk_dz(offlineVtx)')
+
 pixRatio1 = doRatio( onlTauPix          , offTaus )
 pixRatio2 = doRatio( onlTauPixPassingDM , offTaus )
 pixRatio3 = doRatio( onlTauPixPassingIso, offTaus )
@@ -96,14 +96,16 @@ muRatio1 = doRatio( onlTauMu          , offTaus )
 muRatio2 = doRatio( onlTauMuPassingDM , offTaus )
 muRatio3 = doRatio( onlTauMuPassingIso, offTaus )
 
-plot( pixRatio1, 'p_{T}>20 GeV', 'pixefficiency', 'offline #tau p_{T} [GeV]', 'efficiency', morehistos = {pixRatio2:[ROOT.kGreen+3,'pass DecayMode'],pixRatio3:[ROOT.kBlue,'pass Isolation']} )
-plot( muRatio1 , 'p_{T}>20 GeV', 'muefficiency' , 'offline #tau p_{T} [GeV]', 'efficiency', morehistos = {muRatio2 :[ROOT.kGreen+3,'pass DecayMode'],muRatio3 :[ROOT.kBlue,'pass Isoaltion']} )
+# plot( pixRatio1, 'p_{T}>20 GeV', 'pixefficiency', 'offline #tau p_{T} [GeV]', 'efficiency', morehistos = {pixRatio2:[ROOT.kGreen+3,'pass DecayMode'],pixRatio3:[ROOT.kBlue,'pass Isolation']} )
+# plot( muRatio1 , 'p_{T}>20 GeV', 'muefficiency' , 'offline #tau p_{T} [GeV]', 'efficiency', morehistos = {muRatio2 :[ROOT.kGreen+3,'pass DecayMode'],muRatio3 :[ROOT.kBlue,'pass Isoaltion']} )
 
-# plotRatios( pixRatio1, 'pixefficiency', 'offline #tau p_{T} [GeV]', 'efficiency', morehistos = {pixRatio2:ROOT.kGreen+3} )
-# plotRatios( muRatio1 , 'muefficiency' , 'offline #tau p_{T} [GeV]', 'efficiency', morehistos = {muRatio2:ROOT.kGreen +3} )
-  
+# plot( pixRatio1, 'p_{T}>20 GeV', 'pixefficiency', 'gen #tau p_{T} [GeV]', 'efficiency', morehistos = {pixRatio2:[ROOT.kGreen+3,'pass DecayMode'],pixRatio3:[ROOT.kBlue,'pass Isolation']} )
+# plot( muRatio1 , 'p_{T}>20 GeV', 'muefficiency' , 'gen #tau p_{T} [GeV]', 'efficiency', morehistos = {muRatio2 :[ROOT.kGreen+3,'pass DecayMode'],muRatio3 :[ROOT.kBlue,'pass Isoaltion']} )
 
+plot( pixRatio1, 'p_{T}>20 GeV', 'pixefficiency', 'gen #tau p_{T} [GeV]', 'efficiency', morehistos = {pixRatio2:[ROOT.kGreen+3,'pass DecayMode']} )
+plot( muRatio1 , 'p_{T}>20 GeV', 'muefficiency' , 'gen #tau p_{T} [GeV]', 'efficiency', morehistos = {muRatio2 :[ROOT.kGreen+3,'pass DecayMode']} )
 
+plot( vert , '', 'dzPix_Off' , 'dz [cm]', 'events' )
 
 
 

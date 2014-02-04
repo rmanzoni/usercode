@@ -6,7 +6,7 @@ ROOT.TH1.SetDefaultSumw2()
 
 class PATreader() :
 
-  def __init__(self, files, basic_histos, track_histos) :
+  def __init__(self, files, basic_histos, track_histos, vertex_histos) :
 
     self.events = Events ( files )
     self.declareHandles()
@@ -17,8 +17,13 @@ class PATreader() :
     self.failinRecoHLT_mu  = 0
     self.failinDMHLT_mu    = 0
     self.failinIsoHLT_mu   = 0
+    self.hasNoOnlineTrk_mu = 0 
+    self.hasRegionJet_mu   = 0
+    self.hasRegionTrk_mu   = 0
+    self.hasRegion_mu      = 0
     self.basic_histos      = basic_histos
     self.track_histos      = track_histos
+    self.vertex_histos     = vertex_histos
     
   def looper(self, maxEvents=-1, pickEvents=[], verbose=False) :
         
@@ -47,8 +52,6 @@ class PATreader() :
       if abs(off_vtx[0].z()-off_tau[0].vertex().z()) > 0.2 : continue  
       if off_tau[0].charge() * off_mu[0].charge() >= 0     : continue
       if self.deltaR(off_tau[0], off_mu[0]) < 0.5          : continue  
-
-      self.allEvents += 1
       
       tau = off_tau[0]
       mu  = off_mu [0]
@@ -62,12 +65,15 @@ class PATreader() :
       tau.offlineLeadingTrack = self.checkLeadingTrack(tau)
       if tau.offlineLeadingTrack is False : continue
       tau.onlineLeadingTrack  = self.best_matching([tau.offlineLeadingTrack], [cand for cand in onlPFcandidates if cand.charge()!=0], dR=0.1).values()[0]
+
+      #if abs(onlPixVtx[0].z() - offVtx[0].z()) < 0.2: continue
       
       if verbose :
         print '\nevent', event.eventAuxiliary().event()   
         print 'tau pt', tau.pt(), '\teta', tau.eta(), '\tphi', tau.phi(), '\tcharge', tau.charge(), '\trecoDM', tau.decayMode(), '\tgenDM', tau.genDM   
 
       self.fillBasicHistos(self.basic_histos,'offTaus',tau)
+      self.allEvents += 1
 
       ## check whether Tau is reconstructed online - MuVtx
       if not onl_tau_mu_vtx :
@@ -77,16 +83,27 @@ class PATreader() :
         ## check whether Tau has leading track online - MuVtx
         if onl_tau_mu_vtx.tauID('decayModeFinding') < 0.5  :
           self.failinDMHLT_mu    += 1
+          TauJetsIter0      = self.doSomethingForFailingEvents( onlJets, tau.onlMu, onlTracks0, onlJetsPreTrk )['caloJetsForTracking']
+          FullTrackJetIter0 = [tr for tr in onlTracks0]
+          for tr in TauJetsIter0 : FullTrackJetIter0.append(tr)
           if tau.onlineLeadingTrack is not False :  
+            self.fillVertexAssociationHistos(self.vertex_histos, 'muVtx_failDMonl_hasOnlTrk', offVtx[0], onlMuVtx[0])
             self.fillTrackHistos(self.track_histos, 'offTrk_failDMonl_hasOnlTrk_mu', tau.offlineLeadingTrack, offVtx[0], onlPixVtx[0], onlMuVtx[0])
             self.fillTrackHistos(self.track_histos, 'onlTrk_failDMonl_hasOnlTrk_mu', tau.onlineLeadingTrack , offVtx[0], onlPixVtx[0], onlMuVtx[0])
           else :
+            self.hasNoOnlineTrk_mu += 1
+            if self.best_matching([tau.onlMu],TauJetsIter0).values()[0] is not False : self.hasRegionJet_mu += 1 
+            if self.best_matching([tau.onlMu],onlTracks0).values()[0]   is not False : self.hasRegionTrk_mu += 1 
+            if self.best_matching([tau.onlMu],TauJetsIter0).values()[0] is not False or \
+               self.best_matching([tau.onlMu],onlTracks0).values()[0]   is not False : self.hasRegion_mu +=1
+            self.fillVertexAssociationHistos(self.vertex_histos, 'muVtx_failDMonl_noOnlTrk', offVtx[0], onlMuVtx[0])
             self.fillTrackHistos(self.track_histos, 'offTrk_failDMonl_noOnlTrk_mu' , tau.offlineLeadingTrack, offVtx[0], onlPixVtx[0], onlMuVtx[0])
         else :
+          self.fillVertexAssociationHistos(self.vertex_histos, 'muVtx_passDMonl_hasOnlTrk', offVtx[0], onlMuVtx[0])
           self.fillBasicHistos(self.basic_histos, 'onlTauMuPassingDM',tau) 
         ## check whether Tau is isolated online - MuVtx
         if onl_tau_mu_vtx.tauID('byIsolation') < 0.5 : self.failinIsoHLT_mu   += 1
-        else                                         :  self.fillBasicHistos(self.basic_histos,'onlTauMuPassingIso',tau)
+        else                                         : self.fillBasicHistos(self.basic_histos,'onlTauMuPassingIso',tau)
 
       ## check whether Tau is reconstructed online - PixVtx
       if not onl_tau_pix_vtx :
@@ -97,11 +114,14 @@ class PATreader() :
         if onl_tau_pix_vtx.tauID('decayModeFinding') < 0.5 :
           self.failinDMHLT_pix   += 1
           if tau.onlineLeadingTrack is not False :  
+            self.fillVertexAssociationHistos(self.vertex_histos, 'pixVtx_failDMonl_hasOnlTrk', offVtx[0], onlPixVtx[0])
             self.fillTrackHistos(self.track_histos, 'offTrk_failDMonl_hasOnlTrk_pix', tau.offlineLeadingTrack, offVtx[0], onlPixVtx[0], onlMuVtx[0])
             self.fillTrackHistos(self.track_histos, 'onlTrk_failDMonl_hasOnlTrk_pix', tau.onlineLeadingTrack , offVtx[0], onlPixVtx[0], onlMuVtx[0])
           else :
+            self.fillVertexAssociationHistos(self.vertex_histos, 'pixVtx_failDMonl_noOnlTrk', offVtx[0], onlPixVtx[0])
             self.fillTrackHistos(self.track_histos, 'offTrk_failDMonl_noOnlTrk_pix', tau.offlineLeadingTrack, offVtx[0], onlPixVtx[0], onlMuVtx[0])
         else :  
+          self.fillVertexAssociationHistos(self.vertex_histos, 'pixVtx_passDMonl_hasOnlTrk', offVtx[0], onlPixVtx[0])
           self.fillBasicHistos(self.basic_histos, 'onlTauPixPassingDM',tau)  
         ## check whether Tau is isolated online - PixVtx
         if onl_tau_pix_vtx.tauID('byIsolation') < 0.5 : self.failinIsoHLT_pix  += 1        
@@ -141,7 +161,7 @@ class PATreader() :
     self.handles[ 'onlTracks'      ] = [ Handle('std::vector<reco::Track>'      ),'hltPFMuonMerging'                 ]
       
     self.handles[ 'onlJets'        ] = [ Handle('std::vector<reco::CaloJet>'    ),'hltAntiKT5CaloJetsPFEt5'          ]
-    self.handles[ 'onlJetsPreTrk'  ] = [ Handle('std::vector<reco::CaloJet>'    ),'hltAntiKT5TrackJetsIter0'         ]
+    self.handles[ 'onlJetsPreTrk'  ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltAntiKT5TrackJetsIter0'         ]
     self.handles[ 'onlTrkJets0'    ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltTrackAndTauJetsIter0'          ]
     self.handles[ 'onlTrkJets1'    ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltTrackAndTauJetsIter1'          ]
     self.handles[ 'onlTrkJets2'    ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltTrackAndTauJetsIter2'          ]
@@ -260,21 +280,34 @@ class PATreader() :
     print 'failinRecoHLT_mu  ' ,self.failinRecoHLT_mu  
     print 'failinDMHLT_mu    ' ,self.failinDMHLT_mu    
     print 'failinIsoHLT_mu   ' ,self.failinIsoHLT_mu   
+    print 'hasNoOnlineTrk_mu ' ,self.hasNoOnlineTrk_mu   
+    print 'hasRegionJet_mu   ' ,self.hasRegionJet_mu   
+    print 'hasRegionTrk_mu   ' ,self.hasRegionTrk_mu   
+    print 'hasRegion_mu      ' ,self.hasRegion_mu   
 
   def fillBasicHistos(self, histos, name, particle) :
-    try    : histos[name]['pt'    ].Fill(particle.pt()     )
+    try    : histos[name]['pt'    ].Fill(particle.pt()         )
     except : pass
-    try    : histos[name]['eta'   ].Fill(particle.eta()    )
+    try    : histos[name]['gen_pt'].Fill(particle.genJet().pt())
     except : pass
-    try    : histos[name]['phi'   ].Fill(particle.phi()    )
+    try    : histos[name]['eta'   ].Fill(particle.eta()        )
     except : pass
-    try    : histos[name]['charge'].Fill(particle.charge() )
+    try    : histos[name]['phi'   ].Fill(particle.phi()        )
     except : pass
-    try    : histos[name]['recoDM'].Fill(particle.decayMode)
+    try    : histos[name]['charge'].Fill(particle.charge()     )
     except : pass
-    try    : histos[name]['genDM' ].Fill(particle.genDM    )
+    try    : histos[name]['recoDM'].Fill(particle.decayMode    )
     except : pass
-    
+    try    : histos[name]['genDM' ].Fill(particle.genDM        )
+    except : pass
+
+  def fillVertexAssociationHistos(self, histos, name, vtx1, vtx2) :
+    try    : histos[name]['dxy(offlineVtx)'].Fill( math.sqrt( (vtx1.x()-vtx2.x())*(vtx1.x()-vtx2.x()) + 
+                                                              (vtx1.y()-vtx2.y())*(vtx1.y()-vtx2.y()) ) )
+    except : pass
+    try    : histos[name]['dz(offlineVtx)' ].Fill( abs(vtx1.z()-vtx2.z()) )
+    except : pass
+   
   def fillTrackHistos(self, histos, name, track, offvtx, hltpixvtx, hltmuvtx) :
     try    : histos[name]['pt'                        ] .Fill(track.pt()                                     )
     except : pass
@@ -326,4 +359,59 @@ class PATreader() :
 
   def returnTrackHistos(self) :
     return self.track_histos
+
+  def doSomethingForFailingEvents(self, jetCollection, onlineTau, trackCollection, trackJetCollection) :
+    stuff = {}
+    caloJetsForTracking = self.filterCaloJetsForTracking(jetCollection, onlineTau, trackCollection, trackJetCollection)
+    stuff.update({'caloJetsForTracking':caloJetsForTracking})
+    return stuff
+  
+  def filterCaloJetsForTracking(self, jetCollection, onlineTau, trackCollection, trackJetCollection) :
+    '''
+    Mimics the filtering applied to calo jets online before using them as regions
+    for seeding the tracking
+    '''
+    jetsForTracking = []
+    for jet in onlJets :
+      if self.deltaR(jet,onlineTau)>0.5 : continue
+      if jet.pt() < 5.        : continue 
+      if abs(jet.eta()) > 2.7 : continue
+      ptIn  = 0.
+      ptOut = 0.
+      for tower in jet.getCaloConstituents() :
+        try :
+          mydR = self.deltaR(tower,jet)
+          if   mydR < 0.2 : ptIn  += tower.pt()
+          elif mydR < 0.5 : ptOut += tower.pt()      
+        except : pass
+      try    : frac = ptIn / (ptIn + ptOut)
+      except : frac = 0.
+      if frac < 0.7 : continue
+  
+      nmatch   = 0
+      nmatchpt = 0.
+      for trackJet in trackJetCollection :
+        for trk in trackJet.tracks() :
+          if trk.isNonnull() and trk.isAvailable() :
+            if self.deltaR(trk, jet) < 0.5 :
+              nmatch   += 1
+              nmatchpt += trk.pt()
+      
+      if nmatch>0 or nmatchpt>1. : continue
+  
+      nmatch2   = 0
+      nmatchpt2 = 0.
+      for trk in trackCollection :
+        if self.deltaR(trk, jet) < 0.5 :
+          nmatch2 += 1
+          nmatchpt2 += trk.pt()
+          
+      if nmatchpt2 / jet.pt() > 0.3 : continue
+      jetsForTracking.append(jet)
+    
+    return jetsForTracking
+
+
+
+
 
