@@ -6,7 +6,7 @@ ROOT.TH1.SetDefaultSumw2()
 
 class PATreader() :
 
-  def __init__(self, files, basic_histos, track_histos, vertex_histos) :
+  def __init__(self, files, basic_histos, track_histos, vertex_histos, onlineTauPixVtxCollection='onlTausPixVtx2', onlineTauMuVtxCollection='onlTausMuVtx') :
 
     self.events = Events ( files )
     self.declareHandles()
@@ -24,6 +24,16 @@ class PATreader() :
     self.basic_histos      = basic_histos
     self.track_histos      = track_histos
     self.vertex_histos     = vertex_histos
+    self.onlineTauPixVtxCollection = onlineTauPixVtxCollection
+    self.onlineTauMuVtxCollection  = onlineTauPixMuCollection
+    self.HLTTausCollections = {
+                               'onlTausHPS'     : onlTausHPS    ,
+                               'onlTausMuVtx'   : onlTausMuVtx  ,
+                               'onlTausDAVtx'   : onlTausDAVtx  ,
+                               'onlTausDAVtx2'  : onlTausDAVtx2 ,
+                               'onlTausPixVtx'  : onlTausPixVtx ,
+                               'onlTausPixVtx2' : onlTausPixVtx2,  
+                              }
     
   def looper(self, maxEvents=-1, pickEvents=[], verbose=False) :
         
@@ -56,8 +66,11 @@ class PATreader() :
       tau = off_tau[0]
       mu  = off_mu [0]
 
-      onl_tau_mu_vtx  = self.best_matching([tau], onlTausMuVtx , dR=0.5).values()[0]
-      onl_tau_pix_vtx = self.best_matching([tau], onlTausPixVtx, dR=0.5).values()[0]
+      HLTTausMu  = self.pickHLTTausCollection(self.onlineTauMuVtxCollection)
+      HLTTausPix = self.pickHLTTausCollection(self.onlineTauPixVtxCollection)
+
+      onl_tau_mu_vtx  = self.best_matching([tau], HLTTausMu , dR=0.5).values()[0]
+      onl_tau_pix_vtx = self.best_matching([tau], HLTTausPix, dR=0.5).values()[0]
       
       tau.onlMu               = onl_tau_mu_vtx
       tau.onlPix              = onl_tau_pix_vtx
@@ -142,15 +155,19 @@ class PATreader() :
     self.handles = {}
 
     ## offline
-    self.handles[ 'offTaus'        ] = [ Handle('std::vector<pat::Tau>'         ),'selectedTaus'                     ]
+    self.handles[ 'offTaus'        ] = [ Handle('std::vector<pat::Tau>'         ),'selectedTaus'                     ] # default HPS offline tau 
+    self.handles[ 'offTaus2'       ] = [ Handle('std::vector<pat::Tau>'         ),'selectedTausFixedCone'            ] # fixed cone offline tau - offline reference most similar to online tau (selectedHltPatTausOnl2NP) 
     self.handles[ 'offMuons'       ] = [ Handle('std::vector<pat::Muon>'        ),'selectedMuons'                    ]
     self.handles[ 'offPFcandidates'] = [ Handle('std::vector<reco::PFCandidate>'),'particleFlow'                     ]
     self.handles[ 'offVtx'         ] = [ Handle('std::vector<reco::Vertex>'     ),'selectedPrimaryVertices'          ]
-      
+
     ## online
-    #self.handles[ 'onlTausPixVtx2' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausOnl2NP'         ] ## new features by Michal, to be checked
-    self.handles[ 'onlTausMuVtx'   ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTaus'               ]
-    self.handles[ 'onlTausPixVtx'  ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausStdVtx'         ]
+    self.handles[ 'onlTausHPS'     ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausHPS'            ] # HPS at HLT
+    self.handles[ 'onlTausMuVtx'   ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausNP'             ] # cone tau with muon-vertex
+    self.handles[ 'onlTausDAVtx'   ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausOnlNP'          ] # cone tau with online DA vertex [0]
+    self.handles[ 'onlTausDAVtx2'  ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausOnl2NP'         ] # cone tau with highest-weight online DA vertex
+    self.handles[ 'onlTausPixVtx'  ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxlNP'          ] # cone tau with pixel vertex [0]
+    self.handles[ 'onlTausPixVtx2' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2NP'         ] # cone tau with closest-in-dZ pixel vertex (use it as a baseline)
     self.handles[ 'onlPFcandidates'] = [ Handle('std::vector<reco::PFCandidate>'),'hltParticleFlowForTaus'           ]
       
     self.handles[ 'onlPixTracks'   ] = [ Handle('std::vector<reco::Track>'      ),'hltPixelTracks'                   ]
@@ -410,6 +427,10 @@ class PATreader() :
       jetsForTracking.append(jet)
     
     return jetsForTracking
+
+  def pickHLTTausCollection(self, collectionName) :
+    return self.HLTTausCollections[collectionName]
+
 
 
 
