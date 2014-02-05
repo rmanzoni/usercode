@@ -1,5 +1,7 @@
 import ROOT
 import math
+import signal
+import sys
 from DataFormats.FWLite import Events, Handle
 
 ROOT.TH1.SetDefaultSumw2()
@@ -10,6 +12,7 @@ class PATreader() :
 
     self.events = Events ( files )
     self.declareHandles()
+    self.breakLoop         = False
     self.allEvents         = 0
     self.failinRecoHLT_pix = 0
     self.failinDMHLT_pix   = 0
@@ -26,19 +29,14 @@ class PATreader() :
     self.vertex_histos     = vertex_histos
     self.onlineTauPixVtxCollection = onlineTauPixVtxCollection
     self.onlineTauMuVtxCollection  = onlineTauMuVtxCollection
-    self.HLTTausCollections = {
-                               'onlTausHPS'     : onlTausHPS    ,
-                               'onlTausMuVtx'   : onlTausMuVtx  ,
-                               'onlTausDAVtx'   : onlTausDAVtx  ,
-                               'onlTausDAVtx2'  : onlTausDAVtx2 ,
-                               'onlTausPixVtx'  : onlTausPixVtx ,
-                               'onlTausPixVtx2' : onlTausPixVtx2,  
-                              }
     
   def looper(self, maxEvents=-1, pickEvents=[], verbose=False) :
-        
+
+    signal.signal(signal.SIGINT, self.Exit_gracefully)
+    
     for loopId, event in enumerate(self.events):
       
+      if self.breakLoop : break
       self.event = event
       
       if maxEvents > 0 : totEvents = maxEvents
@@ -49,7 +47,7 @@ class PATreader() :
       if event.eventAuxiliary().event() not in pickEvents and len(pickEvents)>0 : continue
 
       self.produceCollections(event, self.handles)
-
+            
       off_vtx = [ vtx for vtx in offVtx   if self.selectVtx(vtx)                                                                              ] 
       off_tau = [ tau for tau in offTaus  if self.selectKinematics(tau, pt=20., eta=2.3) and self.tauID(tau) and bool(tau.genJet())           ]
       off_mu  = [ mu  for mu  in offMuons if self.selectKinematics(mu , pt=15., eta=2.1) and self.muonID(mu)                                  ]
@@ -68,7 +66,7 @@ class PATreader() :
 
       HLTTausMu  = self.pickHLTTausCollection(self.onlineTauMuVtxCollection)
       HLTTausPix = self.pickHLTTausCollection(self.onlineTauPixVtxCollection)
-
+                  
       onl_tau_mu_vtx  = self.best_matching([tau], HLTTausMu , dR=0.5).values()[0]
       onl_tau_pix_vtx = self.best_matching([tau], HLTTausPix, dR=0.5).values()[0]
       
@@ -141,12 +139,14 @@ class PATreader() :
         else                                          : self.fillBasicHistos(self.basic_histos,'onlTauPixPassingIso',tau)
       
   def produceCollections(self, event, handles) :
+    self.HLTTausCollections = {}
     for key in handles.keys() :
       try :
         handle = handles[key][0]
         label  = handles[key][1]
         event.getByLabel(label,handle)
         globals()[key] = handle.product()
+        if 'onlTau' in key : self.HLTTausCollections.update({key:handle.product()})
       except :
         pass 
 
@@ -431,7 +431,13 @@ class PATreader() :
   def pickHLTTausCollection(self, collectionName) :
     return self.HLTTausCollections[collectionName]
 
-
+  def Exit_gracefully(self, signal, frame):
+    if sys.gettrace() is None : ## this bypasses the following if the pdb is working
+      print '\n\nCaught ctrl-C command. I am going to break the loop gently.\n' 
+      self.breakLoop = True
+    else : 
+      print '\n'
+      sys.exit(0)
 
 
 

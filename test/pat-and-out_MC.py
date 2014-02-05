@@ -476,6 +476,7 @@ process.patOut.outputCommands.append("keep *_hltL3MuonCandidates_*_*")
 process.patOut.outputCommands.append("keep *_towerMaker_*_*")
 process.patOut.outputCommands.append("keep *_selectedTausFixedCone_*_*")
 process.patOut.outputCommands.append("keep *_addPileupInfo_*_*")
+process.patOut.outputCommands.append("keep *_hlt*PFJetCtfWithMaterialTracks_*_*")
 
 
 ## Pat trigger
