@@ -66,10 +66,14 @@ class PATreader() :
 
       HLTTausMu  = self.pickHLTTausCollection(self.onlineTauMuVtxCollection)
       HLTTausPix = self.pickHLTTausCollection(self.onlineTauPixVtxCollection)
-                  
+           
       onl_tau_mu_vtx  = self.best_matching([tau], HLTTausMu , dR=0.5).values()[0]
       onl_tau_pix_vtx = self.best_matching([tau], HLTTausPix, dR=0.5).values()[0]
       
+      ## 31jan PATs are bugged, bypass the matching and keep on developing
+      onl_tau_mu_vtx  = HLTTausMu [0]
+      onl_tau_pix_vtx = HLTTausPix[0]
+           
       tau.onlMu               = onl_tau_mu_vtx
       tau.onlPix              = onl_tau_pix_vtx
       tau.genDM               = self.genDecayMode(self.getGenJetConstituents(tau))
