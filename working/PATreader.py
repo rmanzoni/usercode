@@ -2,37 +2,43 @@ import ROOT
 import math
 import signal
 import sys
+import operator
 from DataFormats.FWLite import Events, Handle
 
 ROOT.TH1.SetDefaultSumw2()
 
 class PATreader() :
 
-  def __init__(self, files, basic_histos, track_histos, vertex_histos, onlineTauPixVtxCollection='onlTausPixVtx2', onlineTauMuVtxCollection='onlTausMuVtx') :
+  def __init__(self                                      , 
+               files                                     , 
+               basic_histos                              , 
+               track_histos                              , 
+               vertex_histos                             , 
+               sorting_histos                            ,
+               onlineTauCollections = ['onlTausPixVtx2'] , 
+               keepAllTaus = False                       ) :
 
     self.events = Events ( files )
     self.declareHandles()
-    self.breakLoop         = False
-    self.allEvents         = 0
-    self.failinRecoHLT_pix = 0
-    self.failinDMHLT_pix   = 0
-    self.failinIsoHLT_pix  = 0
-    self.failinRecoHLT_mu  = 0
-    self.failinDMHLT_mu    = 0
-    self.failinIsoHLT_mu   = 0
-    self.hasNoOnlineTrk_mu = 0 
-    self.hasRegionJet_mu   = 0
-    self.hasRegionTrk_mu   = 0
-    self.hasRegion_mu      = 0
-    self.basic_histos      = basic_histos
-    self.track_histos      = track_histos
-    self.vertex_histos     = vertex_histos
-    self.onlineTauPixVtxCollection = onlineTauPixVtxCollection
-    self.onlineTauMuVtxCollection  = onlineTauMuVtxCollection
+    self.breakLoop            = False
+    self.keepAllTaus          = keepAllTaus
+    self.allEvents            = 0
+    self.failinRecoHLT        = 0
+    self.failinDMHLT          = 0
+    self.failinIsoHLT         = 0
+    self.hasNoOnlineTrk       = 0 
+    self.hasRegionJet         = 0
+    self.hasRegionTrk         = 0
+    self.hasRegion            = 0
+    self.basic_histos         = basic_histos
+    self.track_histos         = track_histos
+    self.vertex_histos        = vertex_histos
+    self.sorting_histos       = sorting_histos
+    self.onlineTauCollections = onlineTauCollections
     
   def looper(self, maxEvents=-1, pickEvents=[], verbose=False) :
 
-    signal.signal(signal.SIGINT, self.Exit_gracefully)
+    signal.signal(signal.SIGINT, self.exit_gracefully)
     
     for loopId, event in enumerate(self.events):
       
@@ -64,83 +70,68 @@ class PATreader() :
       tau = off_tau[0]
       mu  = off_mu [0]
 
-      HLTTausMu  = self.pickHLTTausCollection(self.onlineTauMuVtxCollection)
-      HLTTausPix = self.pickHLTTausCollection(self.onlineTauPixVtxCollection)
-           
-      onl_tau_mu_vtx  = self.best_matching([tau], HLTTausMu , dR=0.5).values()[0]
-      onl_tau_pix_vtx = self.best_matching([tau], HLTTausPix, dR=0.5).values()[0]
-      
-      ## 31jan PATs are bugged, bypass the matching and keep on developing
-      onl_tau_mu_vtx  = HLTTausMu [0]
-      onl_tau_pix_vtx = HLTTausPix[0]
-           
-      tau.onlMu               = onl_tau_mu_vtx
-      tau.onlPix              = onl_tau_pix_vtx
+      tau.genLeadingTrack     = self.getGenLeadingTrack(self.getGenJetConstituents(tau))
       tau.genDM               = self.genDecayMode(self.getGenJetConstituents(tau))
       tau.offlineLeadingTrack = self.checkLeadingTrack(tau)
       if tau.offlineLeadingTrack is False : continue
-      tau.onlineLeadingTrack  = self.best_matching([tau.offlineLeadingTrack], [cand for cand in onlPFcandidates if cand.charge()!=0], dR=0.1).values()[0]
-
+      
       #if abs(onlPixVtx[0].z() - offVtx[0].z()) < 0.2: continue
       
       if verbose :
         print '\nevent', event.eventAuxiliary().event()   
         print 'tau pt', tau.pt(), '\teta', tau.eta(), '\tphi', tau.phi(), '\tcharge', tau.charge(), '\trecoDM', tau.decayMode(), '\tgenDM', tau.genDM   
-
+  
       self.fillBasicHistos(self.basic_histos,'offTaus',tau)
       self.allEvents += 1
 
-      ## check whether Tau is reconstructed online - MuVtx
-      if not onl_tau_mu_vtx :
-        self.failinRecoHLT_mu  += 1
-      else :
-        self.fillBasicHistos(self.basic_histos,'onlTauMu',tau)
-        ## check whether Tau has leading track online - MuVtx
-        if onl_tau_mu_vtx.tauID('decayModeFinding') < 0.5  :
-          self.failinDMHLT_mu    += 1
-          TauJetsIter0      = self.doSomethingForFailingEvents( onlJets, tau.onlMu, onlTracks0, onlJetsPreTrk )['caloJetsForTracking']
-          FullTrackJetIter0 = [tr for tr in onlTracks0]
-          for tr in TauJetsIter0 : FullTrackJetIter0.append(tr)
-          if tau.onlineLeadingTrack is not False :  
-            self.fillVertexAssociationHistos(self.vertex_histos, 'muVtx_failDMonl_hasOnlTrk', offVtx[0], onlMuVtx[0])
-            self.fillTrackHistos(self.track_histos, 'offTrk_failDMonl_hasOnlTrk_mu', tau.offlineLeadingTrack, offVtx[0], onlPixVtx[0], onlMuVtx[0])
-            self.fillTrackHistos(self.track_histos, 'onlTrk_failDMonl_hasOnlTrk_mu', tau.onlineLeadingTrack , offVtx[0], onlPixVtx[0], onlMuVtx[0])
-          else :
-            self.hasNoOnlineTrk_mu += 1
-            if self.best_matching([tau.onlMu],TauJetsIter0).values()[0] is not False : self.hasRegionJet_mu += 1 
-            if self.best_matching([tau.onlMu],onlTracks0).values()[0]   is not False : self.hasRegionTrk_mu += 1 
-            if self.best_matching([tau.onlMu],TauJetsIter0).values()[0] is not False or \
-               self.best_matching([tau.onlMu],onlTracks0).values()[0]   is not False : self.hasRegion_mu +=1
-            self.fillVertexAssociationHistos(self.vertex_histos, 'muVtx_failDMonl_noOnlTrk', offVtx[0], onlMuVtx[0])
-            self.fillTrackHistos(self.track_histos, 'offTrk_failDMonl_noOnlTrk_mu' , tau.offlineLeadingTrack, offVtx[0], onlPixVtx[0], onlMuVtx[0])
+      for onlTauColl in self.onlineTauCollections :
+      
+        HLTTaus = self.pickHLTTausCollection(onlTauColl)       
+        onl_tau = self.best_matching([tau], HLTTaus , dR=0.5).values()[0]
+        
+        ## 31jan PATs are bugged, bypass the matching and keep on developing
+        if self.keepAllTaus :
+          try:
+            onl_tau  = HLTTaus [0]
+          except : continue
+        ####################################################################
+             
+        tau.onlTau              = onl_tau
+        tau.onlineLeadingTrack  = self.best_matching([tau.offlineLeadingTrack], [cand for cand in onlPFcandidates if cand.charge()!=0], dR=0.1).values()[0]
+    
+        ## check whether Tau is reconstructed online
+        if not onl_tau and not self.keepAllTaus :
+          self.failinRecoHLT  += 1
         else :
-          self.fillVertexAssociationHistos(self.vertex_histos, 'muVtx_passDMonl_hasOnlTrk', offVtx[0], onlMuVtx[0])
-          self.fillBasicHistos(self.basic_histos, 'onlTauMuPassingDM',tau) 
-        ## check whether Tau is isolated online - MuVtx
-        if onl_tau_mu_vtx.tauID('byIsolation') < 0.5 : self.failinIsoHLT_mu   += 1
-        else                                         : self.fillBasicHistos(self.basic_histos,'onlTauMuPassingIso',tau)
-
-      ## check whether Tau is reconstructed online - PixVtx
-      if not onl_tau_pix_vtx :
-        self.failinRecoHLT_pix += 1  
-      else :
-        self.fillBasicHistos(self.basic_histos,'onlTauPix',tau)
-        ## check whether Tau has leading track online - PixVtx      
-        if onl_tau_pix_vtx.tauID('decayModeFinding') < 0.5 :
-          self.failinDMHLT_pix   += 1
-          if tau.onlineLeadingTrack is not False :  
-            self.fillVertexAssociationHistos(self.vertex_histos, 'pixVtx_failDMonl_hasOnlTrk', offVtx[0], onlPixVtx[0])
-            self.fillTrackHistos(self.track_histos, 'offTrk_failDMonl_hasOnlTrk_pix', tau.offlineLeadingTrack, offVtx[0], onlPixVtx[0], onlMuVtx[0])
-            self.fillTrackHistos(self.track_histos, 'onlTrk_failDMonl_hasOnlTrk_pix', tau.onlineLeadingTrack , offVtx[0], onlPixVtx[0], onlMuVtx[0])
+          self.fillBasicHistos(self.basic_histos, onlTauColl+'_recoHLT' ,tau)
+          ## check whether Tau has leading track online
+          if onl_tau.tauID('decayModeFinding') < 0.5 and not self.keepAllTaus :
+            self.failinDMHLT    += 1
+            TauJetsIter0      = self.doSomethingForFailingEvents( onlJets, tau.onlTau, onlTracks0, onlJetsPreTrk )['caloJetsForTracking']
+            FullTrackJetIter0 = [tr for tr in onlTracks0]
+            for tr in TauJetsIter0 : FullTrackJetIter0.append(tr)
+            if tau.onlineLeadingTrack is not False :  
+              self.fillVertexAssociationHistos(self.vertex_histos, onlTauColl+'_PixVtx_failDM_hasOnlTrk', offVtx[0], onlPixVtx[0])
+              self.fillVertexAssociationHistos(self.vertex_histos, onlTauColl+'_MuVtx_failDM_hasOnlTrk' , offVtx[0], onlMuVtx [0])
+              self.fillTrackHistos            (self.track_histos , onlTauColl+'_offTrk_failDM_hasOnlTrk', tau.offlineLeadingTrack, offVtx[0], onlPixVtx[0], onlMuVtx[0])
+              self.fillTrackHistos            (self.track_histos , onlTauColl+'_onlTrk_failDM_hasOnlTrk', tau.onlineLeadingTrack , offVtx[0], onlPixVtx[0], onlMuVtx[0])
+            else :
+              self.hasNoOnlineTrk += 1
+              if self.best_matching([tau.onlTau],TauJetsIter0).values()[0] is not False : self.hasRegionJet += 1 
+              if self.best_matching([tau.onlTau],onlTracks0).values()[0]   is not False : self.hasRegionTrk += 1 
+              if self.best_matching([tau.onlTau],TauJetsIter0).values()[0] is not False or \
+                 self.best_matching([tau.onlTau],onlTracks0).values()[0]   is not False : self.hasRegion +=1
+              self.fillVertexAssociationHistos(self.vertex_histos, onlTauColl+'_PixVtx_failDM_noOnlTrk', offVtx[0], onlPixVtx[0])
+              self.fillVertexAssociationHistos(self.vertex_histos, onlTauColl+'_MuVtx_failDM_noOnlTrk' , offVtx[0], onlMuVtx [0])
+              self.fillTrackHistos            (self.track_histos , onlTauColl+'_offTrk_failDM_noOnlTrk', tau.offlineLeadingTrack, offVtx[0], onlPixVtx[0], onlMuVtx[0])
           else :
-            self.fillVertexAssociationHistos(self.vertex_histos, 'pixVtx_failDMonl_noOnlTrk', offVtx[0], onlPixVtx[0])
-            self.fillTrackHistos(self.track_histos, 'offTrk_failDMonl_noOnlTrk_pix', tau.offlineLeadingTrack, offVtx[0], onlPixVtx[0], onlMuVtx[0])
-        else :  
-          self.fillVertexAssociationHistos(self.vertex_histos, 'pixVtx_passDMonl_hasOnlTrk', offVtx[0], onlPixVtx[0])
-          self.fillBasicHistos(self.basic_histos, 'onlTauPixPassingDM',tau)  
-        ## check whether Tau is isolated online - PixVtx
-        if onl_tau_pix_vtx.tauID('byIsolation') < 0.5 : self.failinIsoHLT_pix  += 1        
-        else                                          : self.fillBasicHistos(self.basic_histos,'onlTauPixPassingIso',tau)
+            self.fillBasicHistos            (self.basic_histos  , onlTauColl+'_passDM'                 , tau) 
+            self.fillVertexAssociationHistos(self.vertex_histos , onlTauColl+'_PixVtx_passDM_hasOnlTrk', offVtx[0], onlPixVtx[0])
+            self.fillVertexAssociationHistos(self.vertex_histos , onlTauColl+'_MuVtx_passDM_hasOnlTrk' , offVtx[0], onlMuVtx [0])
+            self.fillSortingHistos          (self.sorting_histos, onlTauColl+'_2passDM'                , tau.genLeadingTrack, tau.onlineLeadingTrack)
+          ## check whether Tau is isolated online
+          if onl_tau.tauID('byIsolation') < 0.5 and not self.keepAllTaus : self.failinIsoHLT   += 1
+          else                                                           : self.fillBasicHistos(self.basic_histos,onlTauColl+'_passIso',tau)
       
   def produceCollections(self, event, handles) :
     self.HLTTausCollections = {}
@@ -294,17 +285,14 @@ class PATreader() :
       return [ -99, 'bad tau' ]  
       
   def printSummary(self) :
-    print 'allEvents         ' ,self.allEvents         
-    print 'failinRecoHLT_pix ' ,self.failinRecoHLT_pix 
-    print 'failinDMHLT_pix   ' ,self.failinDMHLT_pix   
-    print 'failinIsoHLT_pix  ' ,self.failinIsoHLT_pix  
-    print 'failinRecoHLT_mu  ' ,self.failinRecoHLT_mu  
-    print 'failinDMHLT_mu    ' ,self.failinDMHLT_mu    
-    print 'failinIsoHLT_mu   ' ,self.failinIsoHLT_mu   
-    print 'hasNoOnlineTrk_mu ' ,self.hasNoOnlineTrk_mu   
-    print 'hasRegionJet_mu   ' ,self.hasRegionJet_mu   
-    print 'hasRegionTrk_mu   ' ,self.hasRegionTrk_mu   
-    print 'hasRegion_mu      ' ,self.hasRegion_mu   
+    print 'allEvents      ' ,self.allEvents         
+    print 'failinRecoHLT  ' ,self.failinRecoHLT  
+    print 'failinDMHLT    ' ,self.failinDMHLT    
+    print 'failinIsoHLT   ' ,self.failinIsoHLT   
+    print 'hasNoOnlineTrk ' ,self.hasNoOnlineTrk   
+    print 'hasRegionJet   ' ,self.hasRegionJet   
+    print 'hasRegionTrk   ' ,self.hasRegionTrk   
+    print 'hasRegion      ' ,self.hasRegion   
 
   def fillBasicHistos(self, histos, name, particle) :
     try    : histos[name]['pt'    ].Fill(particle.pt()         )
@@ -374,7 +362,13 @@ class PATreader() :
     except : pass
     try    : histos[name]['algo'                      ] .Fill(track.algo()-4                                 )
     except : pass
-
+  
+  def fillSortingHistos(self, histos, name, genTrk, onlTrk) :
+    try    : histos[name]['differenceInverse'         ] .Fill(1./genTrk.pt()-1./onlTrk.pt()                  )
+    except : pass
+    try    : histos[name]['pull'                      ] .Fill((genTrk.pt()-onlTrk.pt()) / onlTrk.ptError()   )
+    except : pass
+    
   def returnBasicHistos(self) :
     return self.basic_histos
 
@@ -435,13 +429,18 @@ class PATreader() :
   def pickHLTTausCollection(self, collectionName) :
     return self.HLTTausCollections[collectionName]
 
-  def Exit_gracefully(self, signal, frame):
+  def exit_gracefully(self, signal, frame):
     if sys.gettrace() is None : ## this bypasses the following if the pdb is working
       print '\n\nCaught ctrl-C command. I am going to break the loop gently.\n' 
       self.breakLoop = True
     else : 
       print '\n'
       sys.exit(0)
+      
+  def getGenLeadingTrack(self, getGenJetConstituents) :
+    charged_hadrons = [ pi for pi in getGenJetConstituents if pi.charge() != 0 and abs(pi.pdgId()) != 11 and abs(pi.pdgId()) != 13 ] 
+    charged_hadrons.sort(key=operator.methodcaller("pt"), reverse=True)    
+    return charged_hadrons[0]
 
 
 
