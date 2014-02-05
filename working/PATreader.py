@@ -25,7 +25,7 @@ class PATreader() :
     self.track_histos      = track_histos
     self.vertex_histos     = vertex_histos
     self.onlineTauPixVtxCollection = onlineTauPixVtxCollection
-    self.onlineTauMuVtxCollection  = onlineTauPixMuCollection
+    self.onlineTauMuVtxCollection  = onlineTauMuVtxCollection
     self.HLTTausCollections = {
                                'onlTausHPS'     : onlTausHPS    ,
                                'onlTausMuVtx'   : onlTausMuVtx  ,

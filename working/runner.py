@@ -3,8 +3,8 @@ import PATreader
 from array import array
 from files import *
 
-# bins = array('d',[0.,17.5,20.,22.5,25.,30.,40.,50.,60.,80.,120.,250.,500,])
-bins = array('d',[0.,17.5,20.,22.5,25.,30.,40.,50.,60.,80.,120.])
+bins = array('d',[0.,17.5,20.,22.5,25.,30.,40.,50.,60.,80.,120.,250.,500,])
+# bins = array('d',[0.,17.5,20.,22.5,25.,30.,40.,50.,60.,80.,120.])
 
 basic_histos = {}
 names  = ['offTaus'            ,
