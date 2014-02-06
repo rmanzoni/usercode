@@ -37,7 +37,7 @@ class PATreader() :
     self.onlineTauCollections = onlineTauCollections
     
   def looper(self, maxEvents=-1, pickEvents=[], verbose=False) :
-
+    
     signal.signal(signal.SIGINT, self.exit_gracefully)
     
     for loopId, event in enumerate(self.events):
@@ -83,6 +83,7 @@ class PATreader() :
   
       self.fillBasicHistos(self.basic_histos,'offTaus',tau)
       self.allEvents += 1
+      self.fillTree( self.tree, tau.vertex(), off_vtx)
 
       for onlTauColl in self.onlineTauCollections :
       
@@ -129,10 +130,13 @@ class PATreader() :
             self.fillVertexAssociationHistos(self.vertex_histos , onlTauColl+'_PixVtx_passDM_hasOnlTrk', offVtx[0], onlPixVtx[0])
             self.fillVertexAssociationHistos(self.vertex_histos , onlTauColl+'_MuVtx_passDM_hasOnlTrk' , offVtx[0], onlMuVtx [0])
             self.fillSortingHistos          (self.sorting_histos, onlTauColl+'_2passDM'                , tau.genLeadingTrack, tau.onlineLeadingTrack)
+
           ## check whether Tau is isolated online
           if onl_tau.tauID('byIsolation') < 0.5 and not self.keepAllTaus : self.failinIsoHLT   += 1
           else                                                           : self.fillBasicHistos(self.basic_histos,onlTauColl+'_passIso',tau)
-      
+    
+    #self.writeTree( self.tree, self.treeFile)  
+  
   def produceCollections(self, event, handles) :
     self.HLTTausCollections = {}
     for key in handles.keys() :
@@ -158,10 +162,12 @@ class PATreader() :
 
     ## online
     self.handles[ 'onlTausHPS'     ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausHPS'            ] # HPS at HLT
-    self.handles[ 'onlTausMuVtx'   ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausNP'             ] # cone tau with muon-vertex
+    self.handles[ 'onlTausMuVtx'   ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTaus'               ] # old version
+    #self.handles[ 'onlTausMuVtx'   ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausNP'             ] # cone tau with muon-vertex
     self.handles[ 'onlTausDAVtx'   ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausOnlNP'          ] # cone tau with online DA vertex [0]
     self.handles[ 'onlTausDAVtx2'  ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausOnl2NP'         ] # cone tau with highest-weight online DA vertex
-    self.handles[ 'onlTausPixVtx'  ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxlNP'          ] # cone tau with pixel vertex [0]
+    self.handles[ 'onlTausPixVtx'  ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausStdVtx'         ] # old version
+    #self.handles[ 'onlTausPixVtx'  ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxlNP'          ] # cone tau with pixel vertex [0]
     self.handles[ 'onlTausPixVtx2' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2NP'         ] # cone tau with closest-in-dZ pixel vertex (use it as a baseline)
     self.handles[ 'onlPFcandidates'] = [ Handle('std::vector<reco::PFCandidate>'),'hltParticleFlowForTaus'           ]
       
@@ -364,9 +370,9 @@ class PATreader() :
     except : pass
   
   def fillSortingHistos(self, histos, name, genTrk, onlTrk) :
-    try    : histos[name]['differenceInverse'         ] .Fill(1./genTrk.pt()-1./onlTrk.pt()                  )
+    try    : histos[name]['differenceInverse'         ] .Fill(1./genTrk.pt()-1./onlTrk.pt()                           )
     except : pass
-    try    : histos[name]['pull'                      ] .Fill((genTrk.pt()-onlTrk.pt()) / onlTrk.ptError()   )
+    try    : histos[name]['pull'                      ] .Fill((genTrk.pt()-onlTrk.pt()) / onlTrk.trackRef().ptError() )
     except : pass
     
   def returnBasicHistos(self) :
@@ -441,6 +447,76 @@ class PATreader() :
     charged_hadrons = [ pi for pi in getGenJetConstituents if pi.charge() != 0 and abs(pi.pdgId()) != 11 and abs(pi.pdgId()) != 13 ] 
     charged_hadrons.sort(key=operator.methodcaller("pt"), reverse=True)    
     return charged_hadrons[0]
+
+  def bookTree(self, treename, treetitle = 'myTree') :
+    import numpy as n
+    
+    tree = ROOT.TTree(treename, treetitle)
+
+    treeFile = ROOT.TFile.Open('tree.root','recreate')
+    treeFile.cd()
+    
+    self.reco_vtx_pt = n.zeros(1, dtype=float)
+    self.reco_vtx_z  = n.zeros(1, dtype=float)
+    self.reco_vtx_x  = n.zeros(1, dtype=float)
+    self.reco_vtx_y  = n.zeros(1, dtype=float)
+    self.tau_vtx_pt  = n.zeros(1, dtype=float)
+    self.tau_vtx_z   = n.zeros(1, dtype=float)
+    self.tau_vtx_x   = n.zeros(1, dtype=float)
+    self.tau_vtx_y   = n.zeros(1, dtype=float)
+
+    tree.Branch('reco_vtx_pt',self.reco_vtx_pt,'reco_vtx_pt/D')
+    tree.Branch('reco_vtx_z' ,self.reco_vtx_z ,'reco_vtx_z/D' )
+    tree.Branch('reco_vtx_x' ,self.reco_vtx_x ,'reco_vtx_x/D' )    
+    tree.Branch('reco_vtx_y' ,self.reco_vtx_y ,'reco_vtx_y/D' )
+    tree.Branch('tau_vtx_pt' ,self.tau_vtx_pt ,'tau_vtx_pt/D' )
+    tree.Branch('tau_vtx_z'  ,self.tau_vtx_z  ,'tau_vtx_z/D'  )
+    tree.Branch('tau_vtx_x'  ,self.tau_vtx_x  ,'tau_vtx_x/D'  )    
+    tree.Branch('tau_vtx_y'  ,self.tau_vtx_y  ,'tau_vtx_y/D'  )
+
+    self.tree     = tree
+    self.treeFile = treeFile
+
+  def fillTree(self, tree, tauVtx, recoVtxCollection) :
+    #import pdb ; pdb.set_trace()
+    self.reco_vtx_pt[0] = recoVtxCollection[0].p4().pt()
+    self.reco_vtx_z [0] = recoVtxCollection[0].z()
+    self.reco_vtx_x [0] = recoVtxCollection[0].x()
+    self.reco_vtx_y [0] = recoVtxCollection[0].y()
+    closestTauVtx = self.findClosestVertex(tauVtx, recoVtxCollection)
+    self.tau_vtx_pt [0] = closestTauVtx.p4().pt()
+    self.tau_vtx_z  [0] = closestTauVtx.z()
+    self.tau_vtx_x  [0] = closestTauVtx.x()
+    self.tau_vtx_y  [0] = closestTauVtx.y()
+    tree.Fill()
+
+  def writeTree(self, tree, treeFile) :
+    treeFile.cd()
+    tree.Write()
+    treeFile.Close()
+    
+  def findClosestVertex(self, myVtx, vtxCollection) :
+    dzMax = 9999.
+    for vtx in vtxCollection :
+      if abs(vtx.z() - myVtx.z()) < dzMax :
+        dzMax = abs(vtx.z() - myVtx.z())
+        closestVtx = vtx
+    return closestVtx    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
