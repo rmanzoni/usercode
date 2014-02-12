@@ -15,6 +15,7 @@ class PATreader() :
                track_histos                              , 
                vertex_histos                             , 
                sorting_histos                            ,
+               index                                     ,
                onlineTauCollections = ['onlTausPixVtx2'] , 
                keepAllTaus = False                       ) :
 
@@ -34,6 +35,7 @@ class PATreader() :
     self.track_histos         = track_histos
     self.vertex_histos        = vertex_histos
     self.sorting_histos       = sorting_histos
+    self.index                = index
     self.onlineTauCollections = onlineTauCollections
     
   def looper(self, maxEvents=-1, pickEvents=[], verbose=False) :
@@ -54,7 +56,7 @@ class PATreader() :
 
       self.produceCollections(event, self.handles)
             
-      off_vtx = [ vtx for vtx in offVtx   if self.selectVtx(vtx)                                                                              ] 
+      off_vtx = [ vtx for vtx in offVtx   if self.selectVtx(vtx)                                                                              ]       
       off_tau = [ tau for tau in offTaus  if self.selectKinematics(tau, pt=20., eta=2.3) and self.tauID(tau) and bool(tau.genJet())           ]
       off_mu  = [ mu  for mu  in offMuons if self.selectKinematics(mu , pt=15., eta=2.1) and self.muonID(mu)                                  ]
       veto_mu = [ mu  for mu  in offMuons if self.selectKinematics(mu , pt=15., eta=2.4) and self.muonID(mu, iso_threshold=0.3, fullID=False) ]
@@ -70,6 +72,39 @@ class PATreader() :
       tau = off_tau[0]
       mu  = off_mu [0]
 
+      #self.onlPixSumPt2 = self.vtxSumTrkPt(onlPixTracks, onlPixVtx[0], power=2, lowerThreshold=0, upperThreshold=-1.)
+      #self.offSumPt2    = self.vtxSumTrkPt(offTracks   , off_vtx  [0], power=2, lowerThreshold=0, upperThreshold=-1.)
+
+      #onlPixVtxSorted0 = self.sortVtxCollectionSumByPt2(onlPixTracks, onlPixVtx, power=1, lowerThreshold=2.5, upperThreshold=10.0)
+      #onlPixVtxSorted1 = self.sortVtxCollectionSumByPt2(onlPixTracks, onlPixVtx, power=2, lowerThreshold=2.5, upperThreshold=10.0)
+      #onlPixVtxSorted2 = self.sortVtxCollectionSumByPt2(onlPixTracks, onlPixVtx, power=3, lowerThreshold=2.5, upperThreshold=10.0)
+      #onlPixVtxSorted3 = self.sortVtxCollectionSumByPt2(onlPixTracks, onlPixVtx, power=4, lowerThreshold=2.5, upperThreshold=10.0)
+      #onlPixVtxSorted4 = self.sortVtxCollectionSumByPt2(onlPixTracks, onlPixVtx, power=1, lowerThreshold=2.5, upperThreshold=25.0)
+      #onlPixVtxSorted5 = self.sortVtxCollectionSumByPt2(onlPixTracks, onlPixVtx, power=2, lowerThreshold=2.5, upperThreshold=25.0)
+      #onlPixVtxSorted6 = self.sortVtxCollectionSumByPt2(onlPixTracks, onlPixVtx, power=3, lowerThreshold=2.5, upperThreshold=25.0)
+      #onlPixVtxSorted7 = self.sortVtxCollectionSumByPt2(onlPixTracks, onlPixVtx, power=4, lowerThreshold=2.5, upperThreshold=25.0)
+
+      position, matchedVtx = self.findClosestVertex(off_vtx[0], onlPixVtx)
+      self.index['position'].Fill(position)
+      #position, matchedVtx = self.findClosestVertex(off_vtx[0], onlPixVtxSorted0)
+      #self.index['position0'].Fill(position) 
+      #position, matchedVtx = self.findClosestVertex(off_vtx[0], onlPixVtxSorted1)
+      #self.index['position1'].Fill(position) 
+      #position, matchedVtx = self.findClosestVertex(off_vtx[0], onlPixVtxSorted2)
+      #self.index['position2'].Fill(position) 
+      #position, matchedVtx = self.findClosestVertex(off_vtx[0], onlPixVtxSorted3)
+      #self.index['position3'].Fill(position) 
+      #position, matchedVtx = self.findClosestVertex(off_vtx[0], onlPixVtxSorted4)
+      #self.index['position4'].Fill(position) 
+      #position, matchedVtx = self.findClosestVertex(off_vtx[0], onlPixVtxSorted5)
+      #self.index['position5'].Fill(position) 
+      #position, matchedVtx = self.findClosestVertex(off_vtx[0], onlPixVtxSorted6)
+      #self.index['position6'].Fill(position) 
+      #position, matchedVtx = self.findClosestVertex(off_vtx[0], onlPixVtxSorted7)
+      #self.index['position7'].Fill(position)
+      
+      #continue
+
       tau.genLeadingTrack     = self.getGenLeadingTrack(self.getGenJetConstituents(tau))
       tau.genDM               = self.genDecayMode(self.getGenJetConstituents(tau))
       tau.offlineLeadingTrack = self.checkLeadingTrack(tau)
@@ -81,9 +116,9 @@ class PATreader() :
         print '\nevent', event.eventAuxiliary().event()   
         print 'tau pt', tau.pt(), '\teta', tau.eta(), '\tphi', tau.phi(), '\tcharge', tau.charge(), '\trecoDM', tau.decayMode(), '\tgenDM', tau.genDM   
   
-      self.fillBasicHistos(self.basic_histos,'offTaus',tau)
+      self.fillBasicHistos(self.basic_histos,'offTaus',tau, onlPixVtx[0], off_vtx[0])
       self.allEvents += 1
-      self.fillTree( self.tree, tau.vertex(), off_vtx)
+      #self.fillTree( self.tree, tau.vertex(), off_vtx)
 
       for onlTauColl in self.onlineTauCollections :
       
@@ -99,17 +134,26 @@ class PATreader() :
              
         tau.onlTau              = onl_tau
         tau.onlineLeadingTrack  = self.best_matching([tau.offlineLeadingTrack], [cand for cand in onlPFcandidates if cand.charge()!=0], dR=0.1).values()[0]
+#         if not tau.onlineLeadingTrack :
+#           tau.onlineLeadingTrack  = self.best_matching([tau.offlineLeadingTrack], [cand for cand in onlTracksPre1 if cand.charge()!=0], dR=0.1).values()[0]
+#         if not tau.onlineLeadingTrack :
+#           tau.onlineLeadingTrack  = self.best_matching([tau.offlineLeadingTrack], [cand for cand in onlTracksPre2 if cand.charge()!=0], dR=0.1).values()[0]
+#         if not tau.onlineLeadingTrack :
+#           tau.onlineLeadingTrack  = self.best_matching([tau.offlineLeadingTrack], [cand for cand in onlTracksPre3 if cand.charge()!=0], dR=0.1).values()[0]
+#         if not tau.onlineLeadingTrack :
+#           tau.onlineLeadingTrack  = self.best_matching([tau.offlineLeadingTrack], [cand for cand in onlTracksPre4 if cand.charge()!=0], dR=0.1).values()[0]
     
         ## check whether Tau is reconstructed online
         if not onl_tau and not self.keepAllTaus :
           self.failinRecoHLT  += 1
         else :
-          self.fillBasicHistos(self.basic_histos, onlTauColl+'_recoHLT' ,tau)
+          self.fillBasicHistos(self.basic_histos, onlTauColl+'_recoHLT' ,tau, onlPixVtx[0], off_vtx[0])
           ## check whether Tau has leading track online
           if onl_tau.tauID('decayModeFinding') < 0.5 and not self.keepAllTaus :
-            self.failinDMHLT    += 1
-            TauJetsIter0      = self.doSomethingForFailingEvents( onlJets, tau.onlTau, onlTracks0, onlJetsPreTrk )['caloJetsForTracking']
-            FullTrackJetIter0 = [tr for tr in onlTracks0]
+            self.fillBasicHistos(self.basic_histos, onlTauColl+'_failDM', tau, onlPixVtx[0], off_vtx[0]) 
+            self.failinDMHLT  += 1
+            TauJetsIter0       = self.doSomethingForFailingEvents( onlJets, tau.onlTau, onlTracks0, onlJetsPreTrk )['caloJetsForTracking']
+            FullTrackJetIter0  = [tr for tr in onlTracks0]
             for tr in TauJetsIter0 : FullTrackJetIter0.append(tr)
             if tau.onlineLeadingTrack is not False :  
               self.fillVertexAssociationHistos(self.vertex_histos, onlTauColl+'_PixVtx_failDM_hasOnlTrk', offVtx[0], onlPixVtx[0])
@@ -126,14 +170,14 @@ class PATreader() :
               self.fillVertexAssociationHistos(self.vertex_histos, onlTauColl+'_MuVtx_failDM_noOnlTrk' , offVtx[0], onlMuVtx [0])
               self.fillTrackHistos            (self.track_histos , onlTauColl+'_offTrk_failDM_noOnlTrk', tau.offlineLeadingTrack, offVtx[0], onlPixVtx[0], onlMuVtx[0])
           else :
-            self.fillBasicHistos            (self.basic_histos  , onlTauColl+'_passDM'                 , tau) 
+            self.fillBasicHistos            (self.basic_histos  , onlTauColl+'_passDM'                 , tau, onlPixVtx[0], off_vtx[0]) 
             self.fillVertexAssociationHistos(self.vertex_histos , onlTauColl+'_PixVtx_passDM_hasOnlTrk', offVtx[0], onlPixVtx[0])
             self.fillVertexAssociationHistos(self.vertex_histos , onlTauColl+'_MuVtx_passDM_hasOnlTrk' , offVtx[0], onlMuVtx [0])
             self.fillSortingHistos          (self.sorting_histos, onlTauColl+'_2passDM'                , tau.genLeadingTrack, tau.onlineLeadingTrack)
 
           ## check whether Tau is isolated online
           if onl_tau.tauID('byIsolation') < 0.5 and not self.keepAllTaus : self.failinIsoHLT   += 1
-          else                                                           : self.fillBasicHistos(self.basic_histos,onlTauColl+'_passIso',tau)
+          else                                                           : self.fillBasicHistos(self.basic_histos,onlTauColl+'_passIso',tau,onlPixVtx[0],off_vtx[0])
     
     #self.writeTree( self.tree, self.treeFile)  
   
@@ -154,40 +198,55 @@ class PATreader() :
     self.handles = {}
 
     ## offline
-    self.handles[ 'offTaus'        ] = [ Handle('std::vector<pat::Tau>'         ),'selectedTaus'                     ] # default HPS offline tau 
-    self.handles[ 'offTaus2'       ] = [ Handle('std::vector<pat::Tau>'         ),'selectedTausFixedCone'            ] # fixed cone offline tau - offline reference most similar to online tau (selectedHltPatTausOnl2NP) 
-    self.handles[ 'offMuons'       ] = [ Handle('std::vector<pat::Muon>'        ),'selectedMuons'                    ]
-    self.handles[ 'offPFcandidates'] = [ Handle('std::vector<reco::PFCandidate>'),'particleFlow'                     ]
-    self.handles[ 'offVtx'         ] = [ Handle('std::vector<reco::Vertex>'     ),'selectedPrimaryVertices'          ]
+    self.handles[ 'offTaus'             ] = [ Handle('std::vector<pat::Tau>'         ),'selectedTaus'                      ] # default HPS offline tau 
+    self.handles[ 'offTaus2'            ] = [ Handle('std::vector<pat::Tau>'         ),'selectedTausFixedCone'             ] # fixed cone offline tau - offline reference most similar to online tau (selectedHltPatTausOnl2NP) 
+    self.handles[ 'offMuons'            ] = [ Handle('std::vector<pat::Muon>'        ),'selectedMuons'                     ]
+    self.handles[ 'offPFcandidates'     ] = [ Handle('std::vector<reco::PFCandidate>'),'particleFlow'                      ]
+    self.handles[ 'offTracks'           ] = [ Handle('std::vector<reco::Track>'      ),'generalTracks'                     ]
+    self.handles[ 'offVtx'              ] = [ Handle('std::vector<reco::Vertex>'     ),'selectedPrimaryVertices'           ]
+     
+    ## online     
+    self.handles[ 'onlTausHPS'          ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausHPS'             ] # HPS at HLT
+    #self.handles[ 'onlTausMuVtx'        ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTaus'                ] # old version
+    self.handles[ 'onlTausMuVtx'        ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausNP'              ] # cone tau with muon-vertex
+    self.handles[ 'onlTausDAVtx'        ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausOnlNP'           ] # cone tau with online DA vertex [0]
+    self.handles[ 'onlTausDAVtx2'       ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausOnl2NP'          ] # cone tau with highest-weight online DA vertex
+    #self.handles[ 'onlTausPixVtx'       ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausStdVtx'          ] # old version
+    self.handles[ 'onlTausPixVtx'       ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxlNP'           ] # cone tau with pixel vertex [0]
+    #self.handles[ 'onlTausPixVtx2'      ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2NP'          ] # cone tau with closest-in-dZ pixel vertex (use it as a baseline)
 
-    ## online
-    self.handles[ 'onlTausHPS'     ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausHPS'            ] # HPS at HLT
-    self.handles[ 'onlTausMuVtx'   ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTaus'               ] # old version
-    #self.handles[ 'onlTausMuVtx'   ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausNP'             ] # cone tau with muon-vertex
-    self.handles[ 'onlTausDAVtx'   ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausOnlNP'          ] # cone tau with online DA vertex [0]
-    self.handles[ 'onlTausDAVtx2'  ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausOnl2NP'         ] # cone tau with highest-weight online DA vertex
-    self.handles[ 'onlTausPixVtx'  ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausStdVtx'         ] # old version
-    #self.handles[ 'onlTausPixVtx'  ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxlNP'          ] # cone tau with pixel vertex [0]
-    self.handles[ 'onlTausPixVtx2' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2NP'         ] # cone tau with closest-in-dZ pixel vertex (use it as a baseline)
-    self.handles[ 'onlPFcandidates'] = [ Handle('std::vector<reco::PFCandidate>'),'hltParticleFlowForTaus'           ]
+    self.handles[ 'onlTausPixVtx2S12N3' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2NP'          ] # R_sgn=0.12, N=3 (as in setup v2)
+    self.handles[ 'onlTausPixVtx2S12N5' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2R12N5NP'     ] # R_sgn=0.12, N=5 
+    self.handles[ 'onlTausPixVtx2S12NN' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2R12NInfNP'   ] # R_sgn=0.12, N=999
+    self.handles[ 'onlTausPixVtx2S15N3' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2R15N3NP'     ] # R_sgn=0.15, N=3
+    self.handles[ 'onlTausPixVtx2S15N5' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2R15N5NP'     ] # R_sgn=0.15, N=5
+    self.handles[ 'onlTausPixVtx2S15NN' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2R15NInfNP'   ] # R_sgn=0.15, N=999
+    self.handles[ 'onlTausPixVtx2S18N3' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2R18N3NP'     ] # R_sgn=0.18, N=3
+    self.handles[ 'onlTausPixVtx2S18N5' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2R18N5NP'     ] # R_sgn=0.18, N=5
+    self.handles[ 'onlTausPixVtx2S18NN' ] = [ Handle('std::vector<pat::Tau>'         ),'selectedHltPatTausPxl2R18NInfNP'   ] # R_sgn=0.18, N=999 (as setup v1)
+ 
+    self.handles[ 'onlPFcandidates'     ] = [ Handle('std::vector<reco::PFCandidate>'),'hltParticleFlowForTaus'            ]  
+    self.handles[ 'onlPixTracks'        ] = [ Handle('std::vector<reco::Track>'      ),'hltPixelTracks'                    ]
+    self.handles[ 'onlTracks0'          ] = [ Handle('std::vector<reco::Track>'      ),'hltPFlowTrackSelectionHighPurity'  ]
+    self.handles[ 'onlTracksPre1'       ] = [ Handle('std::vector<reco::Track>'      ),'hltIter1PFJetCtfWithMaterialTracks']  
+    self.handles[ 'onlTracks1'          ] = [ Handle('std::vector<reco::Track>'      ),'hltIter1Merged'                    ]
+    self.handles[ 'onlTracksPre2'       ] = [ Handle('std::vector<reco::Track>'      ),'hltIter2PFJetCtfWithMaterialTracks']  
+    self.handles[ 'onlTracks2'          ] = [ Handle('std::vector<reco::Track>'      ),'hltIter2Merged'                    ]
+    self.handles[ 'onlTracksPre3'       ] = [ Handle('std::vector<reco::Track>'      ),'hltIter3PFJetCtfWithMaterialTracks']  
+    self.handles[ 'onlTracks3'          ] = [ Handle('std::vector<reco::Track>'      ),'hltIter3Merged'                    ]
+    self.handles[ 'onlTracksPre4'       ] = [ Handle('std::vector<reco::Track>'      ),'hltIter4PFJetCtfWithMaterialTracks']  
+    self.handles[ 'onlTracks'           ] = [ Handle('std::vector<reco::Track>'      ),'hltPFMuonMerging'                  ]
+           
+    self.handles[ 'onlJets'             ] = [ Handle('std::vector<reco::CaloJet>'    ),'hltAntiKT5CaloJetsPFEt5'           ]
+    self.handles[ 'onlJetsPreTrk'       ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltAntiKT5TrackJetsIter0'          ]
+    self.handles[ 'onlTrkJets0'         ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltTrackAndTauJetsIter0'           ]
+    self.handles[ 'onlTrkJets1'         ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltTrackAndTauJetsIter1'           ]
+    self.handles[ 'onlTrkJets2'         ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltTrackAndTauJetsIter2'           ]
+    self.handles[ 'onlTrkJets3'         ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltTrackAndTauJetsIter3'           ]
       
-    self.handles[ 'onlPixTracks'   ] = [ Handle('std::vector<reco::Track>'      ),'hltPixelTracks'                   ]
-    self.handles[ 'onlTracks0'     ] = [ Handle('std::vector<reco::Track>'      ),'hltPFlowTrackSelectionHighPurity' ]
-    self.handles[ 'onlTracks1'     ] = [ Handle('std::vector<reco::Track>'      ),'hltIter1Merged'                   ]
-    self.handles[ 'onlTracks2'     ] = [ Handle('std::vector<reco::Track>'      ),'hltIter2Merged'                   ]
-    self.handles[ 'onlTracks3'     ] = [ Handle('std::vector<reco::Track>'      ),'hltIter3Merged'                   ]
-    self.handles[ 'onlTracks'      ] = [ Handle('std::vector<reco::Track>'      ),'hltPFMuonMerging'                 ]
-      
-    self.handles[ 'onlJets'        ] = [ Handle('std::vector<reco::CaloJet>'    ),'hltAntiKT5CaloJetsPFEt5'          ]
-    self.handles[ 'onlJetsPreTrk'  ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltAntiKT5TrackJetsIter0'         ]
-    self.handles[ 'onlTrkJets0'    ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltTrackAndTauJetsIter0'          ]
-    self.handles[ 'onlTrkJets1'    ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltTrackAndTauJetsIter1'          ]
-    self.handles[ 'onlTrkJets2'    ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltTrackAndTauJetsIter2'          ]
-    self.handles[ 'onlTrkJets3'    ] = [ Handle('std::vector<reco::TrackJet>'   ),'hltTrackAndTauJetsIter3'          ]
-      
-    self.handles[ 'onlPixVtx'      ] = [ Handle('std::vector<reco::Vertex>'     ),'hltPixelVertices'                 ]
-    self.handles[ 'onlInterVtx'    ] = [ Handle('std::vector<reco::Vertex>'     ),'hltOnlineVerticesAfterIter0'      ]
-    self.handles[ 'onlMuVtx'       ] = [ Handle('std::vector<reco::Vertex>'     ),'hltIsoMuonVertex'                 ]
+    self.handles[ 'onlPixVtx'      ] = [ Handle('std::vector<reco::Vertex>'     ),'hltPixelVertices'                  ]
+    self.handles[ 'onlInterVtx'    ] = [ Handle('std::vector<reco::Vertex>'     ),'hltOnlineVerticesAfterIter0'       ]
+    self.handles[ 'onlMuVtx'       ] = [ Handle('std::vector<reco::Vertex>'     ),'hltIsoMuonVertex'                  ]
 
   def selectVtx(self, vtx, ndof=4, max_z=24., max_rho=2.) :
     return vtx.ndof>ndof and abs(vtx.z())<max_z and abs(vtx.position().rho())<max_rho
@@ -216,11 +275,16 @@ class PATreader() :
       return 2*math.pi-PHI
 
   def checkLeadingTrack(self, tau) :
-    if tau.leadPFChargedHadrCand().trackRef().isNull() :
+    try    : 
+      if tau.leadPFChargedHadrCand().trackRef().isNull() :
+        print 'event: ',self.event.eventAuxiliary().event(),'\t good offline Tau leading track has invalid leadPFChargedHadrCand().trackRef()\t SKIPPING' 
+        return False
+      else :
+        return tau.leadPFChargedHadrCand().trackRef()
+    except : 
+      print 'WHAT THE FUCK'
       print 'event: ',self.event.eventAuxiliary().event(),'\t good offline Tau leading track has invalid leadPFChargedHadrCand().trackRef()\t SKIPPING' 
       return False
-    else :
-      return tau.leadPFChargedHadrCand().trackRef()
 
   def deltaR(self, p1, p2) :
     eta1 = p1.eta()
@@ -300,20 +364,28 @@ class PATreader() :
     print 'hasRegionTrk   ' ,self.hasRegionTrk   
     print 'hasRegion      ' ,self.hasRegion   
 
-  def fillBasicHistos(self, histos, name, particle) :
-    try    : histos[name]['pt'    ].Fill(particle.pt()         )
+  def fillBasicHistos(self, histos, name, particle, pixVtx, offVtx) :
+    try    : histos[name]['pt'           ].Fill(particle.pt()         )
     except : pass
-    try    : histos[name]['gen_pt'].Fill(particle.genJet().pt())
+    try    : histos[name]['gen_pt'       ].Fill(particle.genJet().pt())
     except : pass
-    try    : histos[name]['eta'   ].Fill(particle.eta()        )
+    try    : histos[name]['eta'          ].Fill(particle.eta()        )
     except : pass
-    try    : histos[name]['phi'   ].Fill(particle.phi()        )
+    try    : histos[name]['phi'          ].Fill(particle.phi()        )
     except : pass
-    try    : histos[name]['charge'].Fill(particle.charge()     )
+    try    : histos[name]['charge'       ].Fill(particle.charge()     )
     except : pass
-    try    : histos[name]['recoDM'].Fill(particle.decayMode    )
+    try    : histos[name]['recoDM'       ].Fill(particle.decayMode()  )
     except : pass
-    try    : histos[name]['genDM' ].Fill(particle.genDM        )
+    try    : histos[name]['genDM'        ].Fill(particle.genDM[1],1.  )
+    except : pass
+    try    : histos[name]['pixVtxSumPt2' ].Fill(self.onlPixSumPt2,1.  )
+    except : pass
+    try    : histos[name]['offVtxSumPt2' ].Fill(self.offSumPt2   ,1.  )
+    except : pass
+    try    : histos[name]['pixVtxTrkMult'].Fill(pixVtx.nTracks() ,1.  )
+    except : pass
+    try    : histos[name]['offVtxTrkMult'].Fill(offVtx.nTracks() ,1.  )
     except : pass
 
   def fillVertexAssociationHistos(self, histos, name, vtx1, vtx2) :
@@ -375,12 +447,6 @@ class PATreader() :
     try    : histos[name]['pull'                      ] .Fill((genTrk.pt()-onlTrk.pt()) / onlTrk.trackRef().ptError() )
     except : pass
     
-  def returnBasicHistos(self) :
-    return self.basic_histos
-
-  def returnTrackHistos(self) :
-    return self.track_histos
-
   def doSomethingForFailingEvents(self, jetCollection, onlineTau, trackCollection, trackJetCollection) :
     stuff = {}
     caloJetsForTracking = self.filterCaloJetsForTracking(jetCollection, onlineTau, trackCollection, trackJetCollection)
@@ -496,17 +562,33 @@ class PATreader() :
     treeFile.Close()
     
   def findClosestVertex(self, myVtx, vtxCollection) :
-    dzMax = 9999.
-    for vtx in vtxCollection :
+    dzMax    = 9999.
+    position = -1
+    for i,vtx in enumerate(vtxCollection) :
       if abs(vtx.z() - myVtx.z()) < dzMax :
-        dzMax = abs(vtx.z() - myVtx.z())
+        dzMax      = abs(vtx.z() - myVtx.z())
+        position   = i
         closestVtx = vtx
-    return closestVtx    
+    return position,closestVtx    
 
+  def vtxSumTrkPt(self, trkCollection, vtx, power=1, dz=0.1, lowerThreshold=2.5, upperThreshold=10.0) :
+    pt = 0.
+    for tr in trkCollection :
+      if abs(tr.dz(vtx.position())) < dz :
+        if tr.pt() < lowerThreshold                        : continue
+        if tr.pt() > upperThreshold and upperThreshold > 0 : pt += math.pow(upperThreshold, power)
+        else                                               : pt += math.pow(tr.pt()       , power)
+    return pt    
 
-
-
-
+  def sortVtxCollectionSumByPt2(self, trkCollection, vtxCollection, power=1, lowerThreshold=2.5, upperThreshold=10.0) :
+    sumPt = []
+    for vtx in vtxCollection :
+      sumPt.append(self.vtxSumTrkPt(trkCollection, vtx, power, lowerThreshold=lowerThreshold, upperThreshold=upperThreshold))
+    zipped = zip(sumPt,vtxCollection)
+    zipped.sort(reverse=True)
+    newVtxCollection = [ vtx for pt2, vtx in zipped ]
+    #if self.event.eventAuxiliary().event() == 31539862 :    import pdb ; pdb.set_trace()
+    return newVtxCollection
 
 
 
